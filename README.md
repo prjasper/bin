@@ -3,7 +3,7 @@ This repository contains a set of shell scripts that I have found useful in my w
 
 To run these commands, make sure you have a `bin` directory in your home directory and that it is in your shell PATH.
 
-Most commands have a useage message if you type `command -h`.
+Most commands have a usage message if you type `command -h`.
 
 ## Installing
 To install these tools, clone this repository and type these commands:
