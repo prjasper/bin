@@ -8,7 +8,7 @@ To install these tools, clone this repository and type these commands:
     make
 
 ## Uninstalling
-To uninstall these tools, type thses commands:
+To uninstall these tools, type these commands:
 
     cd bin # where this is your cloned repo
     make clean
