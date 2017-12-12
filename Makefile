@@ -1,8 +1,13 @@
+BIN = $(HOME)/bin
 SRC = $(wildcard *.sh)
-EXE := $(patsubst %.sh,$(HOME)/bin/%,$(SRC))
+EXE := $(patsubst %.sh,$(BIN)/%,$(SRC))
 
-$(HOME)/bin/%: $(PWD)/%.sh
+$(BIN)/%: $(PWD)/%.sh
 	chmod a+x $<
 	ln -s $^ $@ 
 
 all: $(EXE)
+
+.PHONY: clean
+clean:
+	rm $(EXE)
