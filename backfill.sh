@@ -65,7 +65,7 @@ fi
 export KRUX_ENVIRONMENT=prod
 sbt <<SBT
 compile
-run-main ${CLASS} ${COMMAND}
+run-main ${CLASS} ${COMMAND} --tags:Purpose=backfill
 exit
 SBT
 
