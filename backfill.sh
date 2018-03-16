@@ -58,14 +58,15 @@ if [ ${GENERATE} -eq 1 ]; then
 else
     COMMAND="create --activate --force \
         --start ${START} ${ENDARG} \
-        --name \"${CLASS} Backfill ${START} to ${END}\""
+        --name \"${CLASS} Backfill ${START} to ${END}\" \
+        --tags:Purpose=backfill"
 fi
 
 # build the pipeline
 export KRUX_ENVIRONMENT=prod
 sbt <<SBT
 compile
-run-main ${CLASS} ${COMMAND} --tags:Purpose=backfill
+runMain ${CLASS} ${COMMAND}
 exit
 SBT
 
