@@ -3,10 +3,11 @@
 # usage
 help() {
     cat <<EOF
-Usage: ${NAME} [-h] [-p PROFILE] [-s] [-t] [-x] [-i] [-e] [-o] [-v] [BUCKET ...]
+Usage: ${NAME} [-h] [-p PROFILE] [-c] [-s] [-t] [-x] [-i] [-e] [-o] [-v] [BUCKET ...]
 Lists the given S3 BUCKETs (defaults to all buckets) from the given PROFILE (defaults to the
 current profile).
     -p an AWS profile required to access the buckets
+    -c rint column headings for the report
     -s report the size in GB of the bucket
     -t report the days at which the first and second transitions occur in the bucket's default
        lifecycle rule
@@ -26,6 +27,7 @@ NAME=`basename $0`
 # process options
 PROFILE=
 PPROFILE=
+COLUMN=0
 SIZE=0
 TRANSITIONS=0
 EXPIRATION=0
@@ -33,11 +35,14 @@ INCOMPLETE=0
 ENVIRONMENT=0
 OWNER=0
 VERSIONING=0
-while getopts "p:stxieovh" OPT; do
+while getopts "p:cstxieovh" OPT; do
     case "$OPT" in
         p)
             PROFILE=--profile=${OPTARG}
             PPROFILE=-p ${OPTARG}
+            ;;
+        c)
+            COLUMN=1
             ;;
         s)
             SIZE=1
@@ -94,6 +99,35 @@ days() {
     fi
 }
 
+
+if [ ${COLUMN} -eq 1 ]; then
+    # print the column headings
+    tput bold
+    if [ ${SIZE} -eq 1 ]; then
+        echo -n -e "Size GB\t"
+    fi
+    if [ ${TRANSITIONS} -eq 1 ]; then
+        echo -n -e "IA\tGlacier\t"
+    fi
+    if [ ${EXPIRATION} -eq 1 ]; then
+        echo -n -e "Exp\t"
+    fi
+    if [ ${INCOMPLETE} -eq 1 ]; then
+        echo -n -e "Inc\t"
+    fi
+    if [ ${ENVIRONMENT} -eq 1 ]; then
+        echo -n -e "Environment\t"
+    fi
+    if [ ${OWNER} -eq 1 ]; then
+        echo -n -e "Owner\t\t"
+    fi
+    if [ ${VERSIONING} -eq 1 ]; then
+        echo -n -e "Versioning\t"
+    fi
+    echo Bucket
+    tput sgr0
+fi
+
 # list the buckets from the given profile one per line
 for BUCKET in ${BUCKETS} ; do
     REGION=$(aws s3api get-bucket-location --bucket ${BUCKET} --query 'LocationConstraint' --output text | \
@@ -123,7 +157,7 @@ for BUCKET in ${BUCKETS} ; do
         TAGS=$(aws ${PROFILE} s3api get-bucket-tagging --bucket ${BUCKET} --region ${REGION} \
             --query 'TagSet[?Key==`Environment`].{E:Value}' --output text 2>/dev/null)
         if [ ${#TAGS} -gt 0 ]; then
-            echo -n "${TAGS} "
+            printf "%-15s" "${TAGS}"
         else
             echo -n -e "-\t"
         fi
@@ -133,7 +167,7 @@ for BUCKET in ${BUCKETS} ; do
         TAGS=$(aws ${PROFILE} s3api get-bucket-tagging --bucket ${BUCKET} --region ${REGION} \
             --query 'TagSet[?Key==`Owner`].{O:Value}' --output text 2>/dev/null)
         if [ ${#TAGS} -gt 0 ]; then
-            echo -n ${TAGS}
+            printf "%-15s" "${TAGS}"
         else
             echo -n -e "-\t"
         fi
