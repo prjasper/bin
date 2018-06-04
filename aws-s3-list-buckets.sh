@@ -7,7 +7,7 @@ Usage: ${NAME} [-h] [-p PROFILE] [-c] [-s] [-t] [-x] [-i] [-e] [-o] [-v] [BUCKET
 Lists the given S3 BUCKETs (defaults to all buckets) from the given PROFILE (defaults to the
 current profile).
     -p an AWS profile required to access the buckets
-    -c rint column headings for the report
+    -c print column headings for the report
     -s report the size in GB of the bucket
     -t report the days at which the first and second transitions occur in the bucket's default
        lifecycle rule
