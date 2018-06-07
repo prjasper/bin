@@ -139,25 +139,25 @@ if [ ${COLUMN} -eq 1 ]; then
     tput bold
     echo -n ${STARTEND}${STARTEND}
     if [ ${SIZE} -eq 1 ]; then
-        echo -n -e "Size GB${DELIMITER}"
+        echo -n -e "Size GB${DELIMITER}${STARTEND}"
     fi
     if [ ${TRANSITIONS} -eq 1 ]; then
-        echo -n -e "IA${DELIMITER}Glacier${DELIMITER}"
+        echo -n -e "IA${DELIMITER}Glacier${DELIMITER}${STARTEND}"
     fi
     if [ ${EXPIRATION} -eq 1 ]; then
-        echo -n -e "Exp${DELIMITER}"
+        echo -n -e "Exp${DELIMITER}${STARTEND}"
     fi
     if [ ${INCOMPLETE} -eq 1 ]; then
-        echo -n -e "Inc${DELIMITER}"
+        echo -n -e "Inc${DELIMITER}${STARTEND}"
     fi
     if [ ${ENVIRONMENT} -eq 1 ]; then
-        echo -n -e "Environment${DELIMITER}"
+        echo -n -e "Environment${DELIMITER}${STARTEND}"
     fi
     if [ ${OWNER} -eq 1 ]; then
-        echo -n -e "Owner   ${DELIMITER}"
+        echo -n -e "Owner   ${DELIMITER}${STARTEND}"
     fi
     if [ ${VERSIONING} -eq 1 ]; then
-        echo -n -e "Versioning${DELIMITER}"
+        echo -n -e "Versioning${DELIMITER}${STARTEND}"
     fi
     echo -n Bucket
     echo ${STARTEND}${STARTEND}
@@ -183,7 +183,7 @@ for BUCKET in ${BUCKETS} ; do
     fi
     if [ ${TRANSITIONS} -eq 1 -o ${EXPIRATION} -eq 1 -o ${INCOMPLETE} -eq 1 ]; then
         RESULT=$(aws s3api get-bucket-lifecycle-configuration --bucket ${BUCKET} --region ${REGION} \
-            --query 'Rules[?Filter.Prefix==``||Filter.Prefix==`/`||Prefix==``||Prefix==`/`].{ATD:Transitions[0].Days,BTS:Transitions[0].StorageClass,CTD:Transitions[1].Days,DTS:Transitions[0].StorageClass,EE:Expiration.Days,FI:AbortIncompleteMultipartUpload.DaysAfterInitiation}' \
+            --query 'Rules[?Filter.Prefix==``||Filter.Prefix==`/`||Prefix==``||Prefix==`/`].{ATD:Transitions[0].Days,BTS:Transitions[0].StorageClass,CTD:Transitions[1].Days,DTS:Transitions[1].StorageClass,EE:Expiration.Days,FI:AbortIncompleteMultipartUpload.DaysAfterInitiation}' \
             --output text 2>/dev/null)
         transitions ${TRANSITIONS} "${RESULT}"
         days ${EXPIRATION} "${RESULT}" 5
@@ -195,7 +195,7 @@ for BUCKET in ${BUCKETS} ; do
         if [ ${#TAGS} -gt 0 ]; then
             printf "%-15s" "${TAGS}"
         else
-            echo -n -e "-${DELIMITER}"
+            printf "%-15s" "-"
         fi
         echo -n -e "${DELIMITER}"
     fi
@@ -205,7 +205,7 @@ for BUCKET in ${BUCKETS} ; do
         if [ ${#TAGS} -gt 0 ]; then
             printf "%-15s" "${TAGS}"
         else
-            echo -n -e "-${DELIMITER}"
+            printf "%-15s" "-"
         fi
         echo -n -e "${DELIMITER}"
     fi
@@ -214,7 +214,7 @@ for BUCKET in ${BUCKETS} ; do
         if [[ ${ENABLED} == "Enabled" ]]; then
             echo -n "Versioned"
         else
-            echo -n -e "-${DELIMITER}"
+            printf "%-9s" "-"
         fi
         echo -n -e "${DELIMITER}"
     fi
