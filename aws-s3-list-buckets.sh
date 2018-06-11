@@ -1,13 +1,15 @@
 #! /usr/bin/env bash
-  
+ 
 # usage
 help() {
     cat <<EOF
-Usage: ${NAME} [-h] [-p PROFILE] [-c] [-s] [-t] [-x] [-i] [-e] [-o] [-v] [BUCKET ...]
+Usage: ${NAME} [-h] [-p PROFILE] [-c] [-d C] [-j C] [-s] [-t] [-x] [-i] [-e] [-o] [-v] [-1|-2|-3] [BUCKET ...]
 Lists the given S3 BUCKETs (defaults to all buckets) from the given PROFILE (defaults to the
 current profile).
     -p an AWS profile required to access the buckets
     -c print column headings for the report
+    -d use the given character C to separate columns (default is the tab character)
+    -j use the given character C to start and end each line - useful for JIRA tables (default none)
     -s report the size in GB of the bucket
     -t report the days at which the first and second transitions occur in the bucket's default
        lifecycle rule
@@ -16,6 +18,9 @@ current profile).
     -e report the bucket environment from the Environment tag
     -o report the bucket owner from the Owner tag
     -v report whether the bucket has versioning enabled
+    -1 report the top-level "folders" in each bucket
+    -2 report the second-level "folders" in each bucket
+    -3 report the third-level "folders" in each bucket
     -h display this help and exit 
 Note: "None" is displayed if the rule does not contain the setting and "-" if there is no rule.
 EOF
@@ -28,6 +33,8 @@ NAME=`basename $0`
 PROFILE=
 PPROFILE=
 COLUMN=0
+DELIMITER="\t"
+STARTEND=
 SIZE=0
 TRANSITIONS=0
 EXPIRATION=0
@@ -35,7 +42,8 @@ INCOMPLETE=0
 ENVIRONMENT=0
 OWNER=0
 VERSIONING=0
-while getopts "p:cstxieovh" OPT; do
+FOLDERS=0
+while getopts "p:cd:j:stxieov123h" OPT; do
     case "$OPT" in
         p)
             PROFILE=--profile=${OPTARG}
@@ -43,6 +51,12 @@ while getopts "p:cstxieovh" OPT; do
             ;;
         c)
             COLUMN=1
+            ;;
+        d)
+            DELIMITER="${OPTARG}"
+            ;;
+        j)
+            STARTEND="${OPTARG}"
             ;;
         s)
             SIZE=1
@@ -67,6 +81,15 @@ while getopts "p:cstxieovh" OPT; do
         v)
             VERSIONING=1
             ;;
+        1)
+            FOLDERS=1
+            ;;
+        2)
+            FOLDERS=2
+            ;;
+        3)
+            FOLDERS=3
+            ;;
         h)
             help
             exit 0
@@ -86,16 +109,40 @@ else
     BUCKETS=$(aws s3api list-buckets --query 'Buckets[].{Name:Name}' --output text)
 fi
 
+# display the transitions to S3-IA and Glacier
+transitions() {
+    DAYS=$(echo ${2} | cut -d ' ' -f 1)
+    STORAGE=$(echo ${2} | cut -d ' ' -f 2)
+    if [[ ${STORAGE} == 'STANDARD_IA' && ${#DAYS} > 0 ]]; then
+        echo -n ${DAYS}
+    else
+        echo -n "-"
+    fi
+    echo -n -e "${DELIMITER}"
+    if [[ ${STORAGE} == 'GLACIER' && ${#DAYS} > 0 ]]; then
+        echo -n ${DAYS}
+    else
+        DAYS=$(echo ${2} | cut -d ' ' -f 3)
+        STORAGE=$(echo ${2} | cut -d ' ' -f 4)
+        if [[ ${STORAGE} == 'GLACIER' && ${#DAYS} > 0 ]]; then
+            echo -n ${DAYS}
+        else
+            echo -n "-"
+        fi
+    fi
+    echo -n -e "${DELIMITER}"
+}
+
 # display the days for each option
 days() {
     if [ ${1} -eq 1 ]; then
-        DAYS=$(echo ${RESULT} | cut -d ' ' -f ${2})
+        DAYS=$(echo ${2} | cut -d ' ' -f ${3})
         if [ ${#DAYS} -gt 0 ]; then
             echo -n ${DAYS}
         else
             echo -n "-"
         fi
-        echo -n -e "\t"
+        echo -n -e "${DELIMITER}"
     fi
 }
 
@@ -103,33 +150,36 @@ days() {
 if [ ${COLUMN} -eq 1 ]; then
     # print the column headings
     tput bold
+    echo -n ${STARTEND}${STARTEND}
     if [ ${SIZE} -eq 1 ]; then
-        echo -n -e "Size GB\t"
+        echo -n -e "Size GB${DELIMITER}${STARTEND}"
     fi
     if [ ${TRANSITIONS} -eq 1 ]; then
-        echo -n -e "IA\tGlacier\t"
+        echo -n -e "IA${DELIMITER}Glacier${DELIMITER}${STARTEND}"
     fi
     if [ ${EXPIRATION} -eq 1 ]; then
-        echo -n -e "Exp\t"
+        echo -n -e "Exp${DELIMITER}${STARTEND}"
     fi
     if [ ${INCOMPLETE} -eq 1 ]; then
-        echo -n -e "Inc\t"
+        echo -n -e "Inc${DELIMITER}${STARTEND}"
     fi
     if [ ${ENVIRONMENT} -eq 1 ]; then
-        echo -n -e "Environment\t"
+        echo -n -e "Environment${DELIMITER}${STARTEND}"
     fi
     if [ ${OWNER} -eq 1 ]; then
-        echo -n -e "Owner\t\t"
+        echo -n -e "Owner   ${DELIMITER}${STARTEND}"
     fi
     if [ ${VERSIONING} -eq 1 ]; then
-        echo -n -e "Versioning\t"
+        echo -n -e "Versioning${DELIMITER}${STARTEND}"
     fi
-    echo Bucket
+    echo -n Bucket
+    echo ${STARTEND}${STARTEND}
     tput sgr0
 fi
 
 # list the buckets from the given profile one per line
 for BUCKET in ${BUCKETS} ; do
+    echo -n ${STARTEND}
     REGION=$(aws s3api get-bucket-location --bucket ${BUCKET} --query 'LocationConstraint' --output text | \
         awk '{sub(/None/,"us-east-1")}; 1')
     if [ ${SIZE} -eq 1 ]; then
@@ -142,16 +192,15 @@ for BUCKET in ${BUCKETS} ; do
         else
             echo -n -e "Empty"
         fi
-        echo -n -e "\t"
+        echo -n -e "${DELIMITER}"
     fi
     if [ ${TRANSITIONS} -eq 1 -o ${EXPIRATION} -eq 1 -o ${INCOMPLETE} -eq 1 ]; then
         RESULT=$(aws s3api get-bucket-lifecycle-configuration --bucket ${BUCKET} --region ${REGION} \
-            --query 'Rules[?Filter.Prefix==``||Filter.Prefix==`/`||Prefix==``||Prefix==`/`].{AT1:Transitions[0].Days,BT2:Transitions[1].Days,CE:Expiration.Days,DI:AbortIncompleteMultipartUpload.DaysAfterInitiation}' \
+            --query 'Rules[?Filter.Prefix==``||Filter.Prefix==`/`||Prefix==``||Prefix==`/`].{ATD:Transitions[0].Days,BTS:Transitions[0].StorageClass,CTD:Transitions[1].Days,DTS:Transitions[1].StorageClass,EE:Expiration.Days,FI:AbortIncompleteMultipartUpload.DaysAfterInitiation}' \
             --output text 2>/dev/null)
-        days ${TRANSITIONS} 1
-        days ${TRANSITIONS} 2
-        days ${EXPIRATION} 3
-        days ${INCOMPLETE} 4
+        transitions ${TRANSITIONS} "${RESULT}"
+        days ${EXPIRATION} "${RESULT}" 5
+        days ${INCOMPLETE} "${RESULT}" 6
     fi
     if [ ${ENVIRONMENT} -eq 1 ]; then
         TAGS=$(aws ${PROFILE} s3api get-bucket-tagging --bucket ${BUCKET} --region ${REGION} \
@@ -159,9 +208,9 @@ for BUCKET in ${BUCKETS} ; do
         if [ ${#TAGS} -gt 0 ]; then
             printf "%-15s" "${TAGS}"
         else
-            echo -n -e "-\t"
+            printf "%-15s" "-"
         fi
-        echo -n -e "\t"
+        echo -n -e "${DELIMITER}"
     fi
     if [ ${OWNER} -eq 1 ]; then
         TAGS=$(aws ${PROFILE} s3api get-bucket-tagging --bucket ${BUCKET} --region ${REGION} \
@@ -169,18 +218,36 @@ for BUCKET in ${BUCKETS} ; do
         if [ ${#TAGS} -gt 0 ]; then
             printf "%-15s" "${TAGS}"
         else
-            echo -n -e "-\t"
+            printf "%-15s" "-"
         fi
-        echo -n -e "\t"
+        echo -n -e "${DELIMITER}"
     fi
     if [ ${VERSIONING} -eq 1 ]; then
         ENABLED=$(aws ${PROFILE} s3api get-bucket-versioning --bucket ${BUCKET} --region ${REGION} --output text 2>/dev/null)
         if [[ ${ENABLED} == "Enabled" ]]; then
             echo -n "Versioned"
         else
-            echo -n -e "-\t"
+            printf "%-9s" "-"
         fi
-        echo -n -e "\t"
+        echo -n -e "${DELIMITER}"
     fi
-    echo ${BUCKET}
+    echo -n ${BUCKET}
+    echo ${STARTEND}
+    if [ ${FOLDERS} -ge 1 ]; then
+        for FOLDER1 in $(aws ${PROFILE} s3 ls "${BUCKET}" | awk '{ print $2 }') ; do
+            if [ ${FOLDERS} -ge 2 ]; then
+                for FOLDER2 in $(aws ${PROFILE} s3 ls "${BUCKET}/${FOLDER1}" | awk '{ print $2 }') ; do
+                    if [ ${FOLDERS} -ge 3 ]; then
+                        for FOLDER3 in $(aws ${PROFILE} s3 ls "${BUCKET}/${FOLDER1}${FOLDER2}" | awk '{ print $2 }') ; do
+                            echo -e "${DELIMITER}${FOLDER1}${FOLDER2}${FOLDER3}"
+                        done
+                    else
+                        echo -e "${DELIMITER}${FOLDER1}${FOLDER2}"
+                    fi
+                done
+            else
+                echo -e "${DELIMITER}${FOLDER1}"
+            fi
+        done
+    fi
 done
