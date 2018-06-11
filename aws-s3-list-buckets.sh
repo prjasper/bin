@@ -3,13 +3,13 @@
 # usage
 help() {
     cat <<EOF
-Usage: ${NAME} [-h] [-p PROFILE] [-c] [-d CHARACTER] [-j CHARACTER] [-s] [-t] [-x] [-i] [-e] [-o] [-v] [BUCKET ...]
+Usage: ${NAME} [-h] [-p PROFILE] [-c] [-d C] [-j C] [-s] [-t] [-x] [-i] [-e] [-o] [-v] [-1|-2|-3] [BUCKET ...]
 Lists the given S3 BUCKETs (defaults to all buckets) from the given PROFILE (defaults to the
 current profile).
     -p an AWS profile required to access the buckets
     -c print column headings for the report
-    -d use the given CHARACTER to separate columns (default is the tab character)
-    -j use the given character to start and end each line - useful for JIRA tables (default none)
+    -d use the given character C to separate columns (default is the tab character)
+    -j use the given character C to start and end each line - useful for JIRA tables (default none)
     -s report the size in GB of the bucket
     -t report the days at which the first and second transitions occur in the bucket's default
        lifecycle rule
@@ -18,6 +18,9 @@ current profile).
     -e report the bucket environment from the Environment tag
     -o report the bucket owner from the Owner tag
     -v report whether the bucket has versioning enabled
+    -1 report the top-level "folders" in each bucket
+    -2 report the second-level "folders" in each bucket
+    -3 report the third-level "folders" in each bucket
     -h display this help and exit 
 Note: "None" is displayed if the rule does not contain the setting and "-" if there is no rule.
 EOF
@@ -39,7 +42,8 @@ INCOMPLETE=0
 ENVIRONMENT=0
 OWNER=0
 VERSIONING=0
-while getopts "p:cd:j:stxieovh" OPT; do
+FOLDERS=0
+while getopts "p:cd:j:stxieov123h" OPT; do
     case "$OPT" in
         p)
             PROFILE=--profile=${OPTARG}
@@ -76,6 +80,15 @@ while getopts "p:cd:j:stxieovh" OPT; do
             ;;
         v)
             VERSIONING=1
+            ;;
+        1)
+            FOLDERS=1
+            ;;
+        2)
+            FOLDERS=2
+            ;;
+        3)
+            FOLDERS=3
             ;;
         h)
             help
@@ -220,4 +233,21 @@ for BUCKET in ${BUCKETS} ; do
     fi
     echo -n ${BUCKET}
     echo ${STARTEND}
+    if [ ${FOLDERS} -ge 1 ]; then
+        for FOLDER1 in $(aws ${PROFILE} s3 ls "${BUCKET}" | awk '{ print $2 }') ; do
+            if [ ${FOLDERS} -ge 2 ]; then
+                for FOLDER2 in $(aws ${PROFILE} s3 ls "${BUCKET}/${FOLDER1}" | awk '{ print $2 }') ; do
+                    if [ ${FOLDERS} -ge 3 ]; then
+                        for FOLDER3 in $(aws ${PROFILE} s3 ls "${BUCKET}/${FOLDER1}${FOLDER2}" | awk '{ print $2 }') ; do
+                            echo -e "${DELIMITER}${FOLDER1}${FOLDER2}${FOLDER3}"
+                        done
+                    else
+                        echo -e "${DELIMITER}${FOLDER1}${FOLDER2}"
+                    fi
+                done
+            else
+                echo -e "${DELIMITER}${FOLDER1}"
+            fi
+        done
+    fi
 done
