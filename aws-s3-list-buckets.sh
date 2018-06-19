@@ -3,7 +3,7 @@
 # usage
 help() {
     cat <<EOF
-Usage: ${NAME} [-h] [-p PROFILE] [-c] [-d C] [-j C] [-s] [-t] [-x] [-i] [-e] [-o] [-v] [-1|-2|-3] [BUCKET ...]
+Usage: ${NAME} [-h] [-p PROFILE] [-c] [-d C] [-j C] [-s] [-t] [-x] [-i] [-a TAG] [-e] [-o] [-v] [-1|-2|-3] [BUCKET ...]
 Lists the given S3 BUCKETs (defaults to all buckets) from the given PROFILE (defaults to the
 current profile).
     -p an AWS profile required to access the buckets
@@ -15,6 +15,7 @@ current profile).
        lifecycle rule
     -x report the expiration in days from each bucket's default lifecycle rule
     -i report the AbortIncompleteMultipartUpload days from each bucket's default lifecycle rule
+    -a report the value of the named TAG
     -e report the bucket environment from the Environment tag
     -o report the bucket owner from the Owner tag
     -v report whether the bucket has versioning enabled
@@ -39,11 +40,10 @@ SIZE=0
 TRANSITIONS=0
 EXPIRATION=0
 INCOMPLETE=0
-ENVIRONMENT=0
-OWNER=0
+TAGS=()
 VERSIONING=0
 FOLDERS=0
-while getopts "p:cd:j:stxieov123h" OPT; do
+while getopts "p:cd:j:stxia:eov123h" OPT; do
     case "$OPT" in
         p)
             PROFILE=--profile=${OPTARG}
@@ -72,11 +72,14 @@ while getopts "p:cd:j:stxieov123h" OPT; do
         i)
             INCOMPLETE=1
             ;;
+        a)
+            TAGS+=("${OPTARG}")
+            ;;
         e)
-            ENVIRONMENT=1
+            TAGS+=("Environment")
             ;;
         o)
-            OWNER=1
+            TAGS+=("Owner")
             ;;
         v)
             VERSIONING=1
@@ -163,12 +166,9 @@ if [ ${COLUMN} -eq 1 ]; then
     if [ ${INCOMPLETE} -eq 1 ]; then
         echo -n -e "Inc${DELIMITER}${STARTEND}"
     fi
-    if [ ${ENVIRONMENT} -eq 1 ]; then
-        echo -n -e "Environment${DELIMITER}${STARTEND}"
-    fi
-    if [ ${OWNER} -eq 1 ]; then
-        echo -n -e "Owner   ${DELIMITER}${STARTEND}"
-    fi
+    for TAG in "${TAGS[@]}"; do
+        printf "%-15s${DELIMITER}${STARTEND}" "${TAG}"
+    done
     if [ ${VERSIONING} -eq 1 ]; then
         echo -n -e "Versioning${DELIMITER}${STARTEND}"
     fi
@@ -202,32 +202,22 @@ for BUCKET in ${BUCKETS} ; do
         days ${EXPIRATION} "${RESULT}" 5
         days ${INCOMPLETE} "${RESULT}" 6
     fi
-    if [ ${ENVIRONMENT} -eq 1 ]; then
-        TAGS=$(aws ${PROFILE} s3api get-bucket-tagging --bucket ${BUCKET} --region ${REGION} \
-            --query 'TagSet[?Key==`Environment`].{E:Value}' --output text 2>/dev/null)
-        if [ ${#TAGS} -gt 0 ]; then
-            printf "%-15s" "${TAGS}"
+    for TAG in "${TAGS[@]}"; do
+        VALUE=$(aws ${PROFILE} s3api get-bucket-tagging --bucket ${BUCKET} --region ${REGION} \
+            --query "TagSet[?Key==\`${TAG}\`].{V:Value}" --output text 2>/dev/null)
+        if [ ${#VALUE} -gt 0 ]; then
+            printf "%-15s" "${VALUE}"
         else
             printf "%-15s" "-"
         fi
         echo -n -e "${DELIMITER}"
-    fi
-    if [ ${OWNER} -eq 1 ]; then
-        TAGS=$(aws ${PROFILE} s3api get-bucket-tagging --bucket ${BUCKET} --region ${REGION} \
-            --query 'TagSet[?Key==`Owner`].{O:Value}' --output text 2>/dev/null)
-        if [ ${#TAGS} -gt 0 ]; then
-            printf "%-15s" "${TAGS}"
-        else
-            printf "%-15s" "-"
-        fi
-        echo -n -e "${DELIMITER}"
-    fi
+    done
     if [ ${VERSIONING} -eq 1 ]; then
         ENABLED=$(aws ${PROFILE} s3api get-bucket-versioning --bucket ${BUCKET} --region ${REGION} --output text 2>/dev/null)
         if [[ ${ENABLED} == "Enabled" ]]; then
             echo -n "Versioned"
         else
-            printf "%-9s" "-"
+            printf "%-15s" "-"
         fi
         echo -n -e "${DELIMITER}"
     fi
