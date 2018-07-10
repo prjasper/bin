@@ -28,8 +28,8 @@ PPROFILE=
 while getopts "p:e:h" OPT; do
     case "$OPT" in
         p)
-            PROFILE=--profile=${OPTARG}
-            PPROFILE=-p ${OPTARG}
+            PROFILE=--profile="${OPTARG}"
+            PPROFILE="-p ${OPTARG}"
             ;;
         e)
             EXCLUDE=${OPTARG}
