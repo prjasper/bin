@@ -46,8 +46,8 @@ FOLDERS=0
 while getopts "p:cd:j:stxia:eov123h" OPT; do
     case "$OPT" in
         p)
-            PROFILE=--profile=${OPTARG}
-            PPROFILE=-p ${OPTARG}
+            PROFILE="--profile=${OPTARG}"
+            PPROFILE="-p ${OPTARG}"
             ;;
         c)
             COLUMN=1
@@ -109,7 +109,7 @@ shift "$((OPTIND-1))"
 if [ $# -gt 0 ]; then
     BUCKETS=$*
 else
-    BUCKETS=$(aws s3api list-buckets --query 'Buckets[].{Name:Name}' --output text)
+    BUCKETS=$(aws ${PROFILE} s3api list-buckets --query 'Buckets[].{Name:Name}' --output text)
 fi
 
 # display the transitions to S3-IA and Glacier
@@ -180,10 +180,10 @@ fi
 # list the buckets from the given profile one per line
 for BUCKET in ${BUCKETS} ; do
     echo -n ${STARTEND}
-    REGION=$(aws s3api get-bucket-location --bucket ${BUCKET} --query 'LocationConstraint' --output text | \
+    REGION=$(aws ${PROFILE} s3api get-bucket-location --bucket ${BUCKET} --query 'LocationConstraint' --output text | \
         awk '{sub(/None/,"us-east-1")}; 1')
     if [ ${SIZE} -eq 1 ]; then
-        GB=$(aws cloudwatch get-metric-statistics --namespace AWS/S3 --start-time "${YESTERDAY}" \
+        GB=$(aws ${PROFILE} cloudwatch get-metric-statistics --namespace AWS/S3 --start-time "${YESTERDAY}" \
             --end-time "${TODAY}" --period 86400 --statistics Average --region ${REGION} --metric-name BucketSizeBytes \
             --dimensions Name=BucketName,Value="${BUCKET}" Name=StorageType,Value=StandardStorage \
             --query 'Datapoints[].Average[]' --output text | sed 's/e+/*10^/')
@@ -195,7 +195,7 @@ for BUCKET in ${BUCKETS} ; do
         echo -n -e "${DELIMITER}"
     fi
     if [ ${TRANSITIONS} -eq 1 -o ${EXPIRATION} -eq 1 -o ${INCOMPLETE} -eq 1 ]; then
-        RESULT=$(aws s3api get-bucket-lifecycle-configuration --bucket ${BUCKET} --region ${REGION} \
+        RESULT=$(aws ${PROFILE} s3api get-bucket-lifecycle-configuration --bucket ${BUCKET} --region ${REGION} \
             --query 'Rules[?Filter.Prefix==``||Filter.Prefix==`/`||Prefix==``||Prefix==`/`].{ATD:Transitions[0].Days,BTS:Transitions[0].StorageClass,CTD:Transitions[1].Days,DTS:Transitions[1].StorageClass,EE:Expiration.Days,FI:AbortIncompleteMultipartUpload.DaysAfterInitiation}' \
             --output text 2>/dev/null)
         transitions ${TRANSITIONS} "${RESULT}"
