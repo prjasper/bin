@@ -10,6 +10,7 @@ version id.
 It's highly recommended that the PREFIX is specified, because a maximum of 1000 can be
 completed at a time.
 And specifying the VERSION id will ensure that only the intended deletions are restored.
+Note: this only works on versioned buckets, where the previous versions still exist!
     -d debug mode: display the aws command that would be run, without running it
     -p an AWS profile required to access the bucket
     -v the VERSION id for the delete markers to be removed
