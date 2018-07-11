@@ -64,7 +64,7 @@ TMP=/tmp/${NAME}-$$.json
 
 # get the delete markers
 aws ${PROFILE} s3api list-object-versions --bucket ${BUCKET} ${PREFIX} \
-    --query "{Objects:DeleteMarkers[${VERSION}].{VersionId:VersionId,Key:Key}}" > ${TMP}
+    --query "{Objects:DeleteMarkers[${VERSION}]|[0:999].{VersionId:VersionId,Key:Key}}" > ${TMP}
 
 # delete them
 ${DEBUG} aws ${PROFILE} s3api delete-objects --bucket ${BUCKET} --delete file://${TMP}
